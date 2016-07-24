@@ -19,6 +19,7 @@ var db = knex({
 
 var app = express();
 app.use(bodyParser.json());
+app.use('/ui', express.static('ui'));
 
 app.get('/api/people', function(req, res) {
     db.raw("select * from people").then(function(result) {
