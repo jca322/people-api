@@ -1,44 +1,54 @@
 var express = require('express');
 var bodyParser = require('body-parser');
+var knex = require('knex');
+
+var db = knex({
+    client: 'mysql',
+    connection: {
+        host: '127.0.0.1',
+        // TODO: replace with real username and password
+        user: 'root',
+        password: 'root',
+        database: 'people_api'
+    },
+    pool: {
+        min: 0,
+        max: 7
+    }
+});
 
 var app = express();
 app.use(bodyParser.json());
-var people = [{firstName: "Julie", lastName: "Thompson", age: 30, id: 22}, 
-              {firstName: "Kirk", lastName: "Thompson", age: 31, id: 7},
-              {firstName: "Sabrina", lastName: "Thomlan", age: 77, id: 3}];
 
 app.get('/api/people', function(req, res) {
-    res.status(200).send(people);
+    db.raw("select * from people").then(function(result) {
+        res.status(200).send(result[0]);
+    }, function() {
+        res.status(500).send("Error: couldn't connect to the database");
+    });
 });
 
 app.get('/api/people/:id', function(req, res) {
-    for(var i = 0; i < people.length; i++){
-        if(people[i].id == req.params.id) {
-            res.status(200).send(people[i]);
+    db.raw("select * from people where id= ?", [req.params.id]).then(function(result) {
+        if(result[0].length === 0) {
+            res.status(404).send("Id number not found");
             return;
-        } 
-    }
-    res.status(404).send('Id number not found');
+        }
+        res.status(200).send(result[0][0]);
+    }, function() {
+       res.status(500).send("Error: couldn't connect to the database"); 
+    });
 });
 
 app.delete('/api/people/:id', function(req, res) {
-    for(var i = 0; i < people.length; i++){
-        if(people[i].id == req.params.id) {
-            res.status(204).send();
-            people.splice(i, 1);
-            return;
-        } 
-    }
-    res.status(404).send('Id number not found');
+    db.raw("delete from people where id= ?", [req.params.id]).then(function(result) {
+        res.status(204).send();
+    }, function() {
+        res.status(500).send("Error: couldn't connect to the database");
+    });
 });
 
 app.put('/api/people/:id', function(req, res) {
-    for(var i = 0; i < people.length; i++){
-        if(people[i].id == req.params.id) {
-            res.status(409).send('Id number already exists');
-            return;
-        } 
-    }
     if(req.body.firstName.length < 1) {
         res.status(400).send('First name required');
         return;
@@ -55,8 +65,11 @@ app.put('/api/people/:id', function(req, res) {
         res.status(400).send('Id in body must match URL request');
         return;
     }
-    res.status(201).send();
-    people.push(req.body);
+    db.raw("insert into people values (?, ?, ?, ?)", [req.body.id, req.body.firstName, req.body.lastName, req.body.age]).then(function(result) {
+        res.status(201).send();
+    }, function() {
+        res.status(500).send("Error: couldn't connect to the database");
+    });
 });
 
 app.listen(3000);
